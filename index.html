@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة 3tb -  </title>
+    <style>
+        :root { 
+            --main-red: #d31d1d; 
+            --dark-red: #7a0b0b; 
+            --white: #ffffff; 
+            --gold: #ffd700;
+        }
+        
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: radial-gradient(circle, #ff1f1f 0%, #7a0000 100%);
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            color: var(--white);
+            min-height: 100vh;
+        }
+
+        /* شعار 3tb مثل الصورة */
+        .logo { 
+            font-size: 100px; 
+            font-weight: 900; 
+            color: var(--white); 
+            text-shadow: 0px 5px 0px #b3b3b3, 0px 10px 0px #808080, 0px 15px 20px rgba(0,0,0,0.5);
+            margin: 20px 0;
+            letter-spacing: -2px;
+            font-style: italic;
+        }
+
+        /* تصميم الأزرار والمربعات البيضاء بحدود حمراء 3D */
+        .box, .btn-style, .point-btn {
+            background: var(--white);
+            color: var(--dark-red);
+            border: 4px solid var(--dark-red);
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 8px 0px #610000;
+            cursor: pointer;
+            transition: 0.1s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .box:active, .btn-style:active { transform: translateY(4px); box-shadow: 0 4px 0px #610000; }
+
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; width: 90%; max-width: 800px; padding: 20px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .box { height: 100px; font-size: 20px; padding: 10px; line-height: 1.2; }
+        .selected-cat { background: var(--gold) !important; box-shadow: 0 8px 0px #b8860b !important; }
+
+        .btn-style { padding: 15px 60px; font-size: 28px; margin: 20px; min-width: 250px; }
+
+        /* واجهة السؤال */
+        #question-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: var(--white); color: var(--dark-red); display: none; 
+            flex-direction: column; align-items: center; justify-content: center; z-index: 1000;
+        }
+
+        .point-btn { width: 80px; height: 60px; font-size: 22px; }
+        .point-btn.used { background: #999 !important; color: #666 !important; box-shadow: none !important; border-color: #777 !important; }
+
+        input { padding: 15px; border-radius: 15px; border: 3px solid var(--dark-red); text-align: center; font-size: 20px; margin: 10px; width: 280px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); }
+        #score-board { font-size: 26px; margin-bottom: 20px; background: rgba(255,255,255,0.2); padding: 10px 40px; border-radius: 50px; border: 2px solid var(--white); }
+    </style>
+</head>
+<body>
+
+    <div id="screen-1" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
+        <div class="logo">3tb</div>
+        <button class="btn-style" onclick="showScreen(2)">ابدأ اللعب</button>
+    </div>
+
+    <div id="screen-2" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
+        <div class="logo" style="font-size: 50px;">سجل الفرق</div>
+        <input type="text" id="t1-input" placeholder="اسم الفريق الأول">
+        <input type="text" id="t2-input" placeholder="اسم الفريق الثاني">
+        <button class="btn-style" onclick="initBoard()">تأكيد</button>
+    </div>
+
+    <div id="screen-3" style="display: none; flex-direction: column; align-items: center; padding: 20px; width: 100%;">
+        <div id="score-board"></div>
+        <h3 id="status-msg" style="font-size: 24px;">اختر 4 خانات للبدء</h3>
+        <div class="grid" id="main-grid"></div>
+        <button id="start-btn" class="btn-style" style="display:none;" onclick="finalizeSelection()">ابدأ اللعب</button>
+    </div>
+
+    <div id="question-overlay">
+        <div id="timer" style="font-size: 70px; color: red; font-weight: bold;">30</div>
+        <div id="q-content" style="font-size: 38px; padding: 40px; text-align: center; font-weight: bold;"></div>
+        <button class="btn-style" id="show-ans-btn" onclick="showAnswer()">إظهار الإجابة</button>
+        <div id="a-content" style="display: none; font-size: 30px; color: green; font-weight: bold; margin: 20px;"></div>
+        <div id="scoring-section" style="display: none;">
+            <button class="btn-style" id="btn-t1" onclick="addPoints(1)" style="font-size: 18px; padding: 10px 30px;"></button>
+            <button class="btn-style" id="btn-t2" onclick="addPoints(2)" style="font-size: 18px; padding: 10px 30px;"></button>
+            <button class="btn-style" onclick="closeQuestion()" style="background: #ccc; font-size: 18px; padding: 10px 30px; border-color: #888;">تخطي</button>
+        </div>
+    </div>
+
+    <script>
+        const allData = {
+            "1. كلاسيكو": {
+                200: [{q: "ما هي النتيجة الأكبر في تاريخ مواجهات الكلاسيكو؟", a: "11-1 لصالح ريال مدريد"}, {q: "من هو الهداف التاريخي للكلاسيكو؟", a: "ميسي"}],
+                400: [{q: "عام مباراة الـ 11-1؟", a: "1943"}, {q: "عدد مباريات ريال مدريد بدون هزيمة متتالية؟", a: "8"}],
+                600: [{q: "عدد مباريات كاسياس في الكلاسيكو؟", a: "37"}, {q: "عام مباراة الـ 7-0 لبرشلونة؟", a: "1913"}]
+            },
+            "2. حروف": {
+                200: [{q: "نبتة بحرف الزاء طعام أهل النار؟", a: "الزقوم"}, {q: "أداة دفاع بحرف السين؟", a: "السيف"}],
+                400: [{q: "أكلة (و...ن)؟", a: "ورق عنب"}, {q: "أكلة (ب...ط)؟", a: "بلاليط"}],
+                600: [{q: "عشبة للهضم بحرف الشين؟", a: "الشبنث"}, {q: "فاكهة للجلد بحرف الزاء؟", a: "زبيب"}]
+            },
+            "3. سيارات": { 
+                200: [{q: "شنو السيارة اللي تعتبر أسرع سيارة بالعالم؟", a: "بوقاتي شيرون"}, {q: "شنو السيارة المعروفة بلقب الوحش الياباني؟", a: "نيسان جي تي ار"}], 
+                400: [{q: "شنو معنى حرف R في اسم سيارة نيسان جي تي ار؟", a: "Racing"}, {q: "شنو اسم النظام اللي يساعد على تثبيت السرعة تلقائياً؟", a: "Cruise Control"}], 
+                600: [{q: "شنو اسم الفئة الفخمة عند شركة مرسيدس؟", a: "S-Class"}, {q: "كم عدد سلندرات محرك الكادينزا 2014؟", a: "6 سلندر"}] 
+            },
+            "4. أسئلة عامة": { 
+                200: [{q: "ما هي عاصمة الكويت؟", a: "مدينة الكويت"}, {q: "ما هو أكبر كوكب في المجموعة الشمسية؟", a: "المشتري"}], 
+                400: [{q: "ما هو المعدن السائل الوحيد؟", a: "الزئبق"}, {q: "ما هي العملة الرسمية في اليابان؟", a: "الين"}], 
+                600: [{q: "من هو أول إنسان صعد إلى الفضاء؟", a: "يوري غاغارين"}, {q: "ما هي أعمق نقطة في محيطات العالم؟", a: "خندق ماريانا"}] 
+            },
+            "5. تاريخ إسلامي": { 
+                200: [{q: "من هو أول المؤذنين في الإسلام؟", a: "بلال بن رباح"}, {q: "كم عدد الخلفاء الراشدين؟", a: "4"}], 
+                400: [{q: "ما هي أول عاصمة للدولة الأموية؟", a: "دمشق"}, {q: "ما اسم الغزوة التي جُرح فيها الرسول ﷺ؟", a: "غزوة أحد"}], 
+                600: [{q: "في أي عام تم فتح القسطنطينية؟", a: "1453 ميلادي"}, {q: "من هو الصحابي الذي أشار بحفر الخندق؟", a: "سلمان الفارسي"}] 
+            },
+            "6. منطقة الفحيحيل": { 
+                200: [{q: "بقالة سيلين أي قطعة؟", a: "قطعة 8"}, {q: "كم محطة بنزين في الفحيحيل؟", a: "3"}], 
+                400: [{q: "مطعم وك (WOK) أي قطعة؟", a: "قطعة 7"}, {q: "مسجد العصفور أي قطعة؟", a: "قطعة 9"}], 
+                600: [{q: "شنو المطعم اللي جنب شاورما المناخ؟", a: "ليالي الشامية"}, {q: "شنو اسم الصالون اللي عند بقالة سيلين؟", a: "ام سي الصحي لسيدات"}] 
+            },
+            "7. الغاز": { 
+                200: [{q: "شيء تذبحه وتبكي عليه؟", a: "البصل"}, {q: "ما هو الشيء الذي له أرجل ولكنه لا يمشي؟", a: "الكرسي"}], 
+                400: [{q: "أخت خالك وليست خالتك، من هي؟", a: "أمك"}, {q: "يسير بلا رجلين ولا يدخل إلا بالأذنين؟", a: "الصوت"}], 
+                600: [{q: "ما هو الشيء الذي يوجد في وسط باريس؟", a: "حرف الراء"}, {q: "كلي ثقوب ومع ذلك أحفظ الماء؟", a: "الإسفنج"}] 
+            },
+            "8. الساحلي": { 
+                200: [{q: "", a: ""}, {q: "", a: ""}], 
+                400: [{q: "", a: ""}, {q: "", a: ""}], 
+                600: [{q: "", a: ""}, {q: "", a: ""}] 
+            }
+        };
+
+        let selectedCategories = [];
+        let team1, team2, score1 = 0, score2 = 0, currentPoints, timerInterval;
+
+        function showScreen(num) {
+            document.getElementById('screen-1').style.display = (num === 1) ? 'flex' : 'none';
+            document.getElementById('screen-2').style.display = (num === 2) ? 'flex' : 'none';
+            document.getElementById('screen-3').style.display = (num === 3) ? 'flex' : 'none';
+        }
+
+        function initBoard() {
+            team1 = document.getElementById('t1-input').value || "فريق 1";
+            team2 = document.getElementById('t2-input').value || "فريق 2";
+            updateScore();
+            const grid = document.getElementById('main-grid');
+            grid.innerHTML = '';
+            Object.keys(allData).forEach(cat => {
+                let div = document.createElement('div');
+                div.className = 'box';
+                div.innerText = cat;
+                div.onclick = () => {
+                    if (selectedCategories.includes(cat)) {
+                        selectedCategories = selectedCategories.filter(c => c !== cat);
+                        div.classList.remove('selected-cat');
+                    } else if (selectedCategories.length < 4) {
+                        selectedCategories.push(cat);
+                        div.classList.add('selected-cat');
+                    }
+                    document.getElementById('start-btn').style.display = (selectedCategories.length === 4) ? 'block' : 'none';
+                };
+                grid.appendChild(div);
+            });
+            showScreen(3);
+        }
+
+        function finalizeSelection() {
+            const grid = document.getElementById('main-grid');
+            grid.innerHTML = '';
+            document.getElementById('status-msg').innerText = "تحدي الـ 4 فئات";
+            document.getElementById('start-btn').style.display = 'none';
+            grid.style.gridTemplateColumns = "repeat(2, 1fr)";
+
+            selectedCategories.forEach(cat => {
+                let col = document.createElement('div');
+                col.style = "background: rgba(255,255,255,0.1); padding: 15px; border-radius: 20px; border: 2px solid white;";
+                col.innerHTML = `<div class='box' style='background:var(--dark-red); color:white; margin-bottom:15px; cursor:default; height: 60px; box-shadow: none;'>${cat}</div>`;
+                let pGrid = document.createElement('div');
+                pGrid.style = "display: grid; grid-template-columns: 1fr 1fr; gap: 10px;";
+                [200, 200, 400, 400, 600, 600].forEach((pts, i) => {
+                    let btn = document.createElement('div');
+                    btn.className = 'point-btn';
+                    btn.innerText = pts;
+                    btn.onclick = function() { if(!this.classList.contains('used')) openQuestion(cat, pts, i, this); };
+                    pGrid.appendChild(btn);
+                });
+                col.appendChild(pGrid);
+                grid.appendChild(col);
+            });
+        }
+
+        function openQuestion(cat, pts, index, btnEl) {
+            currentPoints = pts;
+            btnEl.classList.add('used');
+            let qData = allData[cat][pts][index % 2];
+            document.getElementById('q-content').innerText = qData.q;
+            document.getElementById('a-content').innerText = "الإجابة: " + qData.a;
+            document.getElementById('a-content').style.display = 'none';
+            document.getElementById('scoring-section').style.display = 'none';
+            document.getElementById('show-ans-btn').style.display = 'block';
+            document.getElementById('btn-t1').innerText = team1;
+            document.getElementById('btn-t2').innerText = team2;
+            document.getElementById('question-overlay').style.display = 'flex';
+            startTimer();
+        }
+
+        function startTimer() {
+            let time = 30;
+            document.getElementById('timer').innerText = time;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                time--;
+                document.getElementById('timer').innerText = time;
+                if (time <= 0) clearInterval(timerInterval);
+            }, 1000);
+        }
+
+        function showAnswer() {
+            clearInterval(timerInterval);
+            document.getElementById('a-content').style.display = 'block';
+            document.getElementById('scoring-section').style.display = 'block';
+            document.getElementById('show-ans-btn').style.display = 'none';
+        }
+
+        function addPoints(t) {
+            if (t === 1) score1 += currentPoints; else score2 += currentPoints;
+            updateScore();
+            closeQuestion();
+        }
+
+        function updateScore() { document.getElementById('score-board').innerText = `${team1}: ${score1} | ${team2}: ${score2}`; }
+        function closeQuestion() { document.getElementById('question-overlay').style.display = 'none'; }
+    </script>
+</body>
+</html>
